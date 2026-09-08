@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AQM Areas We Serve
  * Description: One editable list of the areas AQ covers, rendered anywhere with [aqm_areas]. Edit once, updates every page. Converted from a must-use plugin on 8 Sep 2026 so it can update itself from GitHub releases like every other AQM plugin.
- * Version:     1.2.0
+ * Version:     1.3.0
  * Author:      A. Q. Mufti
  * Plugin URI:  https://github.com/AQMufti/aqm-areas
  * License:     GPL-2.0-or-later
@@ -32,6 +32,30 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+/*
+ * THE UPDATER IS CONSTRUCTED FIRST, DELIBERATELY.
+ *
+ * In 1.1.0 and 1.2.0 the conversion guard ran BEFORE this block and returned
+ * early, so AQM_Updater was never constructed - which removed the "Check for
+ * updates" link from this plugin's row and left no way to update it except a
+ * manual zip upload. A guard that disables the thing that would have fixed the
+ * guard is a trap. Registering the updater first costs nothing (it only adds
+ * filters) and keeps the plugin repairable however badly the rest goes wrong.
+ */
+define( 'AQM_AREAS_FILE', __FILE__ );
+define( 'AQM_AREAS_VERSION', '1.3.0' );
+define( 'AQM_AREAS_GITHUB_REPO', 'AQMufti/aqm-areas' );
+
+// Shared GitHub-release updater - identical mechanism in every AQM plugin.
+require_once __DIR__ . '/aqm-updater.php';
+new AQM_Updater(
+	__FILE__,
+	AQM_AREAS_VERSION,
+	AQM_AREAS_GITHUB_REPO,
+	'AQM Areas We Serve',
+	'One editable list of the areas AQ covers, rendered anywhere with [aqm_areas].'
+);
 
 /*
  * CONVERSION GUARD - remove after the mu-plugin copy is gone.
@@ -82,20 +106,6 @@ if ( function_exists( 'aqm_areas_default_list' ) ) {
 	);
 	return;
 }
-
-define( 'AQM_AREAS_FILE', __FILE__ );
-define( 'AQM_AREAS_VERSION', '1.2.0' );
-define( 'AQM_AREAS_GITHUB_REPO', 'AQMufti/aqm-areas' );
-
-// Shared GitHub-release updater - identical mechanism in every AQM plugin.
-require_once __DIR__ . '/aqm-updater.php';
-new AQM_Updater(
-	__FILE__,
-	AQM_AREAS_VERSION,
-	AQM_AREAS_GITHUB_REPO,
-	'AQM Areas We Serve',
-	'One editable list of the areas AQ covers, rendered anywhere with [aqm_areas].'
-);
 
 /**
  * The list, seeded from the homepage as it stood on 4 Sep 2026.
