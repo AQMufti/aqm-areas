@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AQM Areas We Serve
  * Description: One editable list of the areas AQ covers, rendered anywhere with [aqm_areas]. Edit once, updates every page. Converted from a must-use plugin on 8 Sep 2026 so it can update itself from GitHub releases like every other AQM plugin.
- * Version:     1.3.0
+ * Version:     1.4.0
  * Author:      A. Q. Mufti
  * Plugin URI:  https://github.com/AQMufti/aqm-areas
  * License:     GPL-2.0-or-later
@@ -44,7 +44,7 @@ defined( 'ABSPATH' ) || exit;
  * filters) and keeps the plugin repairable however badly the rest goes wrong.
  */
 define( 'AQM_AREAS_FILE', __FILE__ );
-define( 'AQM_AREAS_VERSION', '1.3.0' );
+define( 'AQM_AREAS_VERSION', '1.4.0' );
 define( 'AQM_AREAS_GITHUB_REPO', 'AQMufti/aqm-areas' );
 
 // Shared GitHub-release updater - identical mechanism in every AQM plugin.
@@ -92,16 +92,44 @@ if ( function_exists( 'aqm_areas_default_list' ) ) {
 	add_action(
 		'admin_notices',
 		function () {
-			$where = 'an unknown file';
+
+			$rel = function ( $path ) {
+				return esc_html( str_replace( ABSPATH, '', (string) $path ) );
+			};
+
+			// Where the symbol was FIRST declared.
+			$first = 'unknown';
 			try {
 				$r     = new ReflectionFunction( 'aqm_areas_default_list' );
-				$where = '<code>' . esc_html( str_replace( ABSPATH, '', (string) $r->getFileName() ) ) . '</code>';
+				$first = $rel( $r->getFileName() );
 			} catch ( Exception $e ) {
 				unset( $e );
 			}
-			echo '<div class="notice notice-warning"><p><strong>AQM Areas We Serve</strong> stood down to avoid a duplicate declaration. '
-				. 'Something already defined <code>aqm_areas_default_list</code>, loaded from ' . $where . '. '
-				. 'No must-use copy is present, so this is not the old file.</p></div>';
+
+			// Where THIS copy lives. If these two differ there are two installs;
+			// if they match, one file is being executed twice, which include_once
+			// should make impossible - and that is the thing worth knowing.
+			$self = $rel( AQM_AREAS_FILE );
+
+			// Who pulled us in this time.
+			$chain = array();
+			foreach ( debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) as $frame ) {
+				if ( ! empty( $frame['file'] ) ) {
+					$chain[] = $rel( $frame['file'] ) . ':' . ( isset( $frame['line'] ) ? (int) $frame['line'] : 0 );
+				}
+			}
+			$chain = array_slice( array_unique( $chain ), 0, 6 );
+
+			$sandbox = defined( 'WP_SANDBOX_SCRAPING' ) ? 'yes' : 'no';
+
+			echo '<div class="notice notice-warning"><p><strong>AQM Areas We Serve</strong> stood down to avoid a duplicate declaration.</p>'
+				. '<p style="font-family:monospace;font-size:12px;line-height:1.7">'
+				. 'this copy&nbsp;&nbsp;: ' . $self . '<br>'
+				. 'declared in: ' . $first . '<br>'
+				. 'same file&nbsp;&nbsp;&nbsp;: ' . ( $self === $first ? 'YES - one file executed twice' : 'no - two separate installs' ) . '<br>'
+				. 'sandbox&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ' . $sandbox . '<br>'
+				. 'included by: ' . esc_html( implode( ' &lt; ', $chain ) )
+				. '</p></div>';
 		}
 	);
 	return;
