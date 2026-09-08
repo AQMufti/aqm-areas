@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AQM Areas We Serve
  * Description: One editable list of the areas AQ covers, rendered anywhere with [aqm_areas]. Edit once, updates every page. Converted from a must-use plugin on 8 Sep 2026 so it can update itself from GitHub releases like every other AQM plugin.
- * Version:     1.5.0
+ * Version:     1.6.0
  * Author:      A. Q. Mufti
  * Plugin URI:  https://github.com/AQMufti/aqm-areas
  * License:     GPL-2.0-or-later
@@ -44,7 +44,7 @@ defined( 'ABSPATH' ) || exit;
  * filters) and keeps the plugin repairable however badly the rest goes wrong.
  */
 define( 'AQM_AREAS_FILE', __FILE__ );
-define( 'AQM_AREAS_VERSION', '1.5.0' );
+define( 'AQM_AREAS_VERSION', '1.6.0' );
 define( 'AQM_AREAS_GITHUB_REPO', 'AQMufti/aqm-areas' );
 
 // Shared GitHub-release updater - identical mechanism in every AQM plugin.
