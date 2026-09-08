@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AQM Areas We Serve
  * Description: One editable list of the areas AQ covers, rendered anywhere with [aqm_areas]. Edit once, updates every page. Converted from a must-use plugin on 8 Sep 2026 so it can update itself from GitHub releases like every other AQM plugin.
- * Version:     1.1.0
+ * Version:     1.2.0
  * Author:      A. Q. Mufti
  * Plugin URI:  https://github.com/AQMufti/aqm-areas
  * License:     GPL-2.0-or-later
@@ -41,7 +41,7 @@ defined( 'ABSPATH' ) || exit;
  * function below would be declared twice and the site would fatal. Bail out
  * instead, and say why on the Plugins screen.
  */
-if ( function_exists( 'aqm_areas_default_list' ) ) {
+if ( file_exists( ( defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins' ) . '/aqm-areas.php' ) ) {
 	add_action(
 		'admin_notices',
 		function () {
@@ -53,8 +53,38 @@ if ( function_exists( 'aqm_areas_default_list' ) ) {
 	return;
 }
 
+/*
+ * Belt and braces. The mu-plugin file is gone, but something else has already
+ * declared our symbols - so loading on would be a fatal redeclare. Bail out
+ * quietly and report WHERE it came from, using reflection, rather than blaming
+ * a file that is not there.
+ *
+ * Version 1.1.0 tested only function_exists( 'aqm_areas_default_list' ), which is a
+ * PROXY for "the old file is still present" rather than the thing itself. When
+ * the four files were deleted on 8 Sep 2026 the notices kept firing, because
+ * the proxy was answering a different question. Test the actual condition.
+ */
+if ( function_exists( 'aqm_areas_default_list' ) ) {
+	add_action(
+		'admin_notices',
+		function () {
+			$where = 'an unknown file';
+			try {
+				$r     = new ReflectionFunction( 'aqm_areas_default_list' );
+				$where = '<code>' . esc_html( str_replace( ABSPATH, '', (string) $r->getFileName() ) ) . '</code>';
+			} catch ( Exception $e ) {
+				unset( $e );
+			}
+			echo '<div class="notice notice-warning"><p><strong>AQM Areas We Serve</strong> stood down to avoid a duplicate declaration. '
+				. 'Something already defined <code>aqm_areas_default_list</code>, loaded from ' . $where . '. '
+				. 'No must-use copy is present, so this is not the old file.</p></div>';
+		}
+	);
+	return;
+}
+
 define( 'AQM_AREAS_FILE', __FILE__ );
-define( 'AQM_AREAS_VERSION', '1.1.0' );
+define( 'AQM_AREAS_VERSION', '1.2.0' );
 define( 'AQM_AREAS_GITHUB_REPO', 'AQMufti/aqm-areas' );
 
 // Shared GitHub-release updater - identical mechanism in every AQM plugin.
