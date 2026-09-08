@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AQM Areas We Serve
  * Description: One editable list of the areas AQ covers, rendered anywhere with [aqm_areas]. Edit once, updates every page. Converted from a must-use plugin on 8 Sep 2026 so it can update itself from GitHub releases like every other AQM plugin.
- * Version:     1.4.0
+ * Version:     1.5.0
  * Author:      A. Q. Mufti
  * Plugin URI:  https://github.com/AQMufti/aqm-areas
  * License:     GPL-2.0-or-later
@@ -44,7 +44,7 @@ defined( 'ABSPATH' ) || exit;
  * filters) and keeps the plugin repairable however badly the rest goes wrong.
  */
 define( 'AQM_AREAS_FILE', __FILE__ );
-define( 'AQM_AREAS_VERSION', '1.4.0' );
+define( 'AQM_AREAS_VERSION', '1.5.0' );
 define( 'AQM_AREAS_GITHUB_REPO', 'AQMufti/aqm-areas' );
 
 // Shared GitHub-release updater - identical mechanism in every AQM plugin.
@@ -58,82 +58,31 @@ new AQM_Updater(
 );
 
 /*
- * CONVERSION GUARD - remove after the mu-plugin copy is gone.
+ * THE CONVERSION GUARDS ARE GONE - 8 Sep 2026, and they are not coming back.
  *
- * This was a must-use plugin until 8 Sep 2026. mu-plugins load BEFORE regular
- * plugins, so if the old mu-plugins/aqm-areas.php is still on the server every
- * function below would be declared twice and the site would fatal. Bail out
- * instead, and say why on the Plugins screen.
- */
-if ( file_exists( ( defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins' ) . '/aqm-areas.php' ) ) {
-	add_action(
-		'admin_notices',
-		function () {
-			echo '<div class="notice notice-error"><p><strong>AQM Areas We Serve</strong> is not running. '
-				. 'The old must-use copy at <code>wp-content/mu-plugins/aqm-areas.php</code> is still on the server '
-				. 'and loads first. Delete that file, then reload this page.</p></div>';
-		}
-	);
-	return;
-}
-
-/*
- * Belt and braces. The mu-plugin file is gone, but something else has already
- * declared our symbols - so loading on would be a fatal redeclare. Bail out
- * quietly and report WHERE it came from, using reflection, rather than blaming
- * a file that is not there.
+ * This file carried two of them: one testing whether the old must-use copy was
+ * still on disk, and one testing function_exists( 'aqm_areas_default_list' ) before
+ * loading on. The second could NEVER be false, and it broke the plugin.
  *
- * Version 1.1.0 tested only function_exists( 'aqm_areas_default_list' ), which is a
- * PROXY for "the old file is still present" rather than the thing itself. When
- * the four files were deleted on 8 Sep 2026 the notices kept firing, because
- * the proxy was answering a different question. Test the actual condition.
+ * PHP hoists unconditional top-level function and class declarations when a
+ * file is included - they exist before the file's first statement runs. So by
+ * the time that guard was evaluated, aqm_areas_default_list was already
+ * defined BY THIS FILE, a few lines below. The guard returned every single
+ * time, and nothing after it ever executed: no add_action, no add_shortcode,
+ * no admin screen. The functions existed; none of them were ever hooked.
+ *
+ * That is why the RECO brokerage line was missing from the site, and why the
+ * reviews stopped rendering, from the moment these plugins were converted.
+ *
+ * The file_exists() guard went too, because it cannot help either: if a
+ * must-use copy declared these same symbols, PHP would fatal on the redeclare
+ * as this file was included, long before any runtime check could return. The
+ * only guard that would work is wrapping the whole file in
+ * if ( ! function_exists( 'aqm_areas_default_list' ) ) - which is what AQM Form Spam
+ * Guard does. The must-use copies are deleted and archived, so nothing here
+ * needs guarding at all.
  */
-if ( function_exists( 'aqm_areas_default_list' ) ) {
-	add_action(
-		'admin_notices',
-		function () {
 
-			$rel = function ( $path ) {
-				return esc_html( str_replace( ABSPATH, '', (string) $path ) );
-			};
-
-			// Where the symbol was FIRST declared.
-			$first = 'unknown';
-			try {
-				$r     = new ReflectionFunction( 'aqm_areas_default_list' );
-				$first = $rel( $r->getFileName() );
-			} catch ( Exception $e ) {
-				unset( $e );
-			}
-
-			// Where THIS copy lives. If these two differ there are two installs;
-			// if they match, one file is being executed twice, which include_once
-			// should make impossible - and that is the thing worth knowing.
-			$self = $rel( AQM_AREAS_FILE );
-
-			// Who pulled us in this time.
-			$chain = array();
-			foreach ( debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) as $frame ) {
-				if ( ! empty( $frame['file'] ) ) {
-					$chain[] = $rel( $frame['file'] ) . ':' . ( isset( $frame['line'] ) ? (int) $frame['line'] : 0 );
-				}
-			}
-			$chain = array_slice( array_unique( $chain ), 0, 6 );
-
-			$sandbox = defined( 'WP_SANDBOX_SCRAPING' ) ? 'yes' : 'no';
-
-			echo '<div class="notice notice-warning"><p><strong>AQM Areas We Serve</strong> stood down to avoid a duplicate declaration.</p>'
-				. '<p style="font-family:monospace;font-size:12px;line-height:1.7">'
-				. 'this copy&nbsp;&nbsp;: ' . $self . '<br>'
-				. 'declared in: ' . $first . '<br>'
-				. 'same file&nbsp;&nbsp;&nbsp;: ' . ( $self === $first ? 'YES - one file executed twice' : 'no - two separate installs' ) . '<br>'
-				. 'sandbox&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ' . $sandbox . '<br>'
-				. 'included by: ' . esc_html( implode( ' &lt; ', $chain ) )
-				. '</p></div>';
-		}
-	);
-	return;
-}
 
 /**
  * The list, seeded from the homepage as it stood on 4 Sep 2026.
