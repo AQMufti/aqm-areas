@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AQM Areas We Serve
  * Description: One editable list of the areas AQ covers, rendered anywhere with [aqm_areas]. Edit once, updates every page. Converted from a must-use plugin on 8 Sep 2026 so it can update itself from GitHub releases like every other AQM plugin.
- * Version:     1.6.0
+ * Version:     1.7.0
  * Author:      A. Q. Mufti
  * Plugin URI:  https://github.com/AQMufti/aqm-areas
  * License:     GPL-2.0-or-later
@@ -44,7 +44,7 @@ defined( 'ABSPATH' ) || exit;
  * filters) and keeps the plugin repairable however badly the rest goes wrong.
  */
 define( 'AQM_AREAS_FILE', __FILE__ );
-define( 'AQM_AREAS_VERSION', '1.6.0' );
+define( 'AQM_AREAS_VERSION', '1.7.0' );
 define( 'AQM_AREAS_GITHUB_REPO', 'AQMufti/aqm-areas' );
 
 // Shared GitHub-release updater - identical mechanism in every AQM plugin.
@@ -132,6 +132,68 @@ function aqm_areas_settings() {
 }
 
 /**
+ * The tile-sized URL for a stored image URL.
+ *
+ * WHY THIS EXISTS  (24 Sep 2026)
+ *
+ * Measured on the live homepage: the 14 tiles were 2 908 KB of the 3 691 KB
+ * media payload - 79% of it - because each one printed the FULL-SIZE upload
+ * into a box that is 407 x 150 CSS pixels. Hamilton alone was a 1600 px WebP
+ * at 410 KB, drawn 407 px wide.
+ *
+ * A CSS background cannot be fixed the way an <img> can. It gets no srcset, no
+ * sizes and no lazy-loading, so there is no smaller candidate for the browser
+ * to choose and no way for it to skip one it never shows. Every visitor on
+ * every device downloads the original - a phone at 390 px wide was pulling the
+ * same 1600 px photograph a desktop did.
+ *
+ * So the size has to be chosen here, in PHP, before the URL is printed.
+ *
+ * `medium_large` is 768 px wide and WordPress has ALREADY generated it for
+ * every one of these uploads. Nothing to regenerate, no new attachments, and
+ * the option AQ edits is left exactly as he typed it. 768 into a 407 px box is
+ * 1.89x, which covers a 2x phone almost exactly.
+ *
+ * It degrades to the stored URL, unchanged, whenever it cannot do better: an
+ * image hosted somewhere else, a file no longer in the media library, an
+ * upload narrower than 768 px. A tile therefore cannot break because of this
+ * function - at worst it renders exactly as it did before.
+ *
+ * A purpose-built 840 x 310 hard crop would be smaller still and would match
+ * the tile's 2.7:1 shape instead of cropping a 3:2 photograph. That one needs
+ * the crop generating for the existing attachments, so it is a later step.
+ */
+function aqm_areas_tile_src( $url ) {
+
+	$url = (string) $url;
+	if ( '' === $url ) {
+		return '';
+	}
+
+	$id = attachment_url_to_postid( $url );
+
+	if ( ! $id ) {
+		// attachment_url_to_postid() is strict about the host, and these URLs are
+		// typed by hand on the AQM Areas screen - www vs no-www is a real
+		// possibility. Normalise onto this site's own uploads base and try once
+		// more before giving up.
+		$dir  = wp_get_upload_dir();
+		$base = isset( $dir['baseurl'] ) ? $dir['baseurl'] : '';
+		if ( $base && preg_match( '#/wp-content/uploads(/.+)$#', $url, $m ) ) {
+			$id = attachment_url_to_postid( $base . $m[1] );
+		}
+	}
+
+	if ( ! $id ) {
+		return $url;
+	}
+
+	$src = wp_get_attachment_image_url( $id, 'medium_large' );
+
+	return $src ? $src : $url;
+}
+
+/**
  * Parse the textarea into rows.
  *
  * One area per line: Name | URL | Image URL
@@ -160,6 +222,36 @@ function aqm_areas_rows() {
 			'url'   => isset( $parts[1] ) ? $parts[1] : '',
 			'image' => isset( $parts[2] ) ? $parts[2] : '',
 		);
+	}
+
+	// Resolving a URL to an attachment is a database query, and this list is
+	// rendered twice on the homepage - 28 queries for a list that only changes
+	// when AQ edits it. So the answers are cached, and the cache is dropped the
+	// moment the list is saved.
+	//
+	// 'image' stays exactly what he typed: it is what the admin screen shows
+	// back to him, and re-resolving is always possible from it. 'src' is the
+	// tile-sized variant and is the only thing the front end prints.
+	$map   = get_transient( 'aqm_areas_tile_src_map' );
+	$map   = is_array( $map ) ? $map : array();
+	$dirty = false;
+
+	foreach ( $rows as &$row ) {
+		if ( '' === $row['image'] ) {
+			$row['src'] = '';
+			continue;
+		}
+		if ( ! isset( $map[ $row['image'] ] ) ) {
+			$map[ $row['image'] ] = aqm_areas_tile_src( $row['image'] );
+			$dirty                = true;
+		}
+		$row['src'] = $map[ $row['image'] ];
+	}
+	unset( $row );   // a reference left pointing into $rows silently corrupts the
+	                 // last element on the next foreach over it.
+
+	if ( $dirty ) {
+		set_transient( 'aqm_areas_tile_src_map', $map, WEEK_IN_SECONDS );
 	}
 
 	return $rows;
@@ -247,8 +339,8 @@ function aqm_areas_shortcode( $atts ) {
 
 	foreach ( $rows as $row ) {
 
-		$style = $row['image']
-			? ' style="background-image:url(' . esc_url( $row['image'] ) . ')"'
+		$style = $row['src']
+			? ' style="background-image:url(' . esc_url( $row['src'] ) . ')"'
 			: '';
 
 		// A tile with no URL is still shown - it just is not a link. Better than
@@ -297,7 +389,8 @@ function aqm_areas_styles() {
 		grid-template-columns:repeat(var(--aqm-areas-cols,7),minmax(0,1fr))}
 	.aqm-areas-tile{position:relative;display:flex;align-items:flex-end;
 		justify-content:center;min-height:150px;border-radius:10px;overflow:hidden;
-		background-size:cover;background-position:center;text-decoration:none!important;
+		background-size:cover;background-position:center;background-repeat:no-repeat;
+		text-decoration:none!important;
 		box-shadow:0 4px 14px rgba(15,23,42,.12);transition:transform .15s,box-shadow .15s}
 	.aqm-areas-tile:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(15,23,42,.2)}
 	/* The scrim keeps white text readable over any photograph. Without it the
@@ -451,6 +544,11 @@ add_action(
 			),
 			false
 		);
+
+		// The list just changed, so every resolved tile URL in the cache may now
+		// be for an image that is no longer in the list, or missing for one that
+		// is. Cheaper to drop it than to reconcile it.
+		delete_transient( 'aqm_areas_tile_src_map' );
 
 		wp_safe_redirect( admin_url( 'admin.php?page=aqm-areas&msg=saved' ) );
 		exit;
